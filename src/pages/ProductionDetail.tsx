@@ -8,7 +8,7 @@ import { useMemo } from 'react';
 export default function ProductionDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { productionOrders, orders, updateProductionOrder } = useAppStore();
+  const { productionOrders, orders, updateProductionOrderWithSync } = useAppStore();
 
   const productionOrder = productionOrders.find((p) => p.id === id);
   const order = orders.find((o) => o.id === productionOrder?.orderId);
@@ -85,7 +85,11 @@ export default function ProductionDetail() {
           )}
           {productionOrder.status === 'pending' && (
             <button
-              onClick={() => updateProductionOrder(productionOrder.id, { status: 'producing' })}
+              onClick={() => {
+                if (confirm('确定要开始生产吗？关联订单将变为"生产中"状态。')) {
+                  updateProductionOrderWithSync(productionOrder.id, { status: 'producing' });
+                }
+              }}
               className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold rounded-xl shadow-sm transition-colors"
             >
               <Package className="w-4 h-4" />
@@ -95,7 +99,9 @@ export default function ProductionDetail() {
           {productionOrder.status === 'producing' && (
             <button
               onClick={() => {
-                updateProductionOrder(productionOrder.id, { status: 'done' });
+                if (confirm('确定要完成生产吗？关联订单将变为"已完成"状态。')) {
+                  updateProductionOrderWithSync(productionOrder.id, { status: 'done' });
+                }
               }}
               className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-semibold rounded-xl shadow-sm transition-colors"
             >

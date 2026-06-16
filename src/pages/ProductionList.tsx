@@ -7,7 +7,7 @@ import { formatDateTime } from '@/utils/format';
 type FilterStatus = 'all' | 'pending' | 'producing' | 'done';
 
 export default function ProductionList() {
-  const { productionOrders, updateProductionOrder } = useAppStore();
+  const { productionOrders, updateProductionOrderWithSync } = useAppStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<FilterStatus>('all');
 
@@ -27,7 +27,10 @@ export default function ProductionList() {
   };
 
   const handleStatusChange = (id: string, status: 'producing' | 'done') => {
-    updateProductionOrder(id, { status });
+    const label = status === 'producing' ? '开始生产' : '完成生产';
+    if (confirm(`确定要${label}吗？订单状态将同步更新。`)) {
+      updateProductionOrderWithSync(id, { status });
+    }
   };
 
   const getStatusInfo = (status: string) => {

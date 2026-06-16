@@ -36,25 +36,14 @@ import { formatCurrency, formatDate, formatDateTime } from '@/utils/format';
 export default function CustomerDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { customers, orders } = useAppStore();
+  const { customers, orders, isLoading } = useAppStore();
 
   const customer = customers.find((c) => c.id === id);
-
-  if (!customer) {
-    return (
-      <div className="flex flex-col items-center justify-center h-[60vh]">
-        <FileText className="w-16 h-16 text-slate-300 mb-4" />
-        <p className="text-slate-500 mb-4">客户不存在</p>
-        <button onClick={() => navigate('/customers')} className="text-amber-600 hover:text-amber-700 font-medium">
-          返回客户列表
-        </button>
-      </div>
-    );
-  }
+  const customerId = customer?.id;
 
   const customerOrders = useMemo(
-    () => orders.filter((o) => o.customerId === customer.id).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
-    [orders, customer.id]
+    () => customerId ? orders.filter((o) => o.customerId === customerId).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()) : [],
+    [orders, customerId]
   );
 
   const validOrders = customerOrders.filter((o) => o.status !== 'cancelled' && o.status !== 'draft');
@@ -130,6 +119,54 @@ export default function CustomerDetail() {
   }, [validOrders]);
 
   const chartColors = productDistribution.map((p) => p.color);
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[60vh]">
+        <div className="w-16 h-16 border-4 border-slate-200 border-t-amber-500 rounded-full animate-spin mb-4"></div>
+        <p className="text-slate-500 font-medium">加载客户数据中...</p>
+        <p className="text-slate-400 text-sm mt-1">请稍候</p>
+      </div>
+    );
+  }
+
+  if (!customer) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => navigate(-1)}
+            className="p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+        </div>
+        <div className="flex flex-col items-center justify-center bg-white rounded-2xl shadow-sm border border-slate-100 p-16">
+          <div className="w-24 h-24 rounded-full bg-slate-50 flex items-center justify-center mb-6">
+            <FileText className="w-12 h-12 text-slate-300" />
+          </div>
+          <h2 className="text-xl font-bold text-slate-700 mb-2">未找到该客户</h2>
+          <p className="text-slate-500 mb-6 text-center">
+            客户信息可能已被删除，或访问链接有误
+          </p>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => navigate('/customers')}
+              className="px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white text-sm font-semibold rounded-xl shadow-sm transition-all"
+            >
+              返回客户列表
+            </button>
+            <button
+              onClick={() => navigate(-1)}
+              className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold rounded-xl transition-all"
+            >
+              返回上一页
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

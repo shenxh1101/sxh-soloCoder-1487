@@ -58,6 +58,9 @@ export interface OrderItem {
   profitRate: number;
   unitPrice: number;
   subtotal: number;
+  useManualPrice: boolean;
+  finalUnitPrice: number;
+  finalSubtotal: number;
 }
 
 export interface Order {
@@ -70,6 +73,8 @@ export interface Order {
   status: OrderStatus;
   remark?: string;
   totalAmount: number;
+  quoteAmount: number;
+  totalCost: number;
   createdAt: string;
   confirmedAt?: string;
   completedAt?: string;

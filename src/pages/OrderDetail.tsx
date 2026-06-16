@@ -189,49 +189,113 @@ export default function OrderDetail() {
         </div>
 
         <div className="space-y-6">
-          <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl shadow-lg p-6 text-white">
-            <h3 className="text-base font-bold mb-4">费用明细</h3>
-            <div className="space-y-3">
-              {order.items.map((item, idx) => (
-                <div key={item.id} className="bg-white/5 rounded-xl p-4 border border-white/10">
-                  <div className="flex justify-between items-center mb-3">
-                    <span className="text-sm font-medium">第 {idx + 1} 项</span>
-                    <span className="text-amber-400 font-bold">{formatCurrency(item.subtotal)}</span>
-                  </div>
-                  <div className="space-y-1.5 text-xs">
-                    <div className="flex justify-between text-slate-400">
-                      <span>纸张成本</span>
-                      <span>¥{item.paperCost.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between text-slate-400">
-                      <span>印刷成本</span>
-                      <span>¥{item.printingCost.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between text-slate-400">
-                      <span>覆膜成本</span>
-                      <span>¥{item.laminationCost.toFixed(2)}</span>
-                    </div>
-                    {item.otherCost > 0 && (
-                      <div className="flex justify-between text-slate-400">
-                        <span>其他成本</span>
-                        <span>¥{item.otherCost.toFixed(2)}</span>
-                      </div>
-                    )}
-                    <div className="flex justify-between text-white pt-2 mt-2 border-t border-white/10">
-                      <span>总成本</span>
-                      <span className="font-medium">¥{item.totalCost.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between text-emerald-400">
-                      <span>利润率</span>
-                      <span className="font-medium">{item.profitRate}%</span>
-                    </div>
-                    <div className="flex justify-between text-slate-300">
-                      <span>单价</span>
-                      <span>¥{item.unitPrice.toFixed(4)}</span>
-                    </div>
-                  </div>
+          <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl shadow-sm border border-amber-200 p-5">
+            <h3 className="text-base font-bold text-amber-900 mb-4 flex items-center gap-2">
+              <span className="w-1 h-5 bg-gradient-to-b from-amber-400 to-orange-500 rounded-full"></span>
+              报价对比汇总
+            </h3>
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              <div className="bg-white/70 rounded-lg p-3 border border-amber-100">
+                <div className="text-xs text-slate-500 mb-1">成本合计</div>
+                <div className="text-lg font-bold text-slate-700">{formatCurrency(order.totalCost)}</div>
+              </div>
+              <div className="bg-white/70 rounded-lg p-3 border border-amber-100">
+                <div className="text-xs text-slate-500 mb-1">系统建议价</div>
+                <div className="text-lg font-bold text-blue-600">{formatCurrency(order.quoteAmount)}</div>
+              </div>
+              <div className="bg-white/70 rounded-lg p-3 border border-amber-100">
+                <div className="text-xs text-slate-500 mb-1">最终报价</div>
+                <div className="text-lg font-bold text-emerald-600">{formatCurrency(order.totalAmount)}</div>
+              </div>
+              <div className="bg-white/70 rounded-lg p-3 border border-amber-100">
+                <div className="text-xs text-slate-500 mb-1">调整差额</div>
+                <div className={`text-lg font-bold ${order.totalAmount - order.quoteAmount >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                  {order.totalAmount - order.quoteAmount >= 0 ? '+' : ''}{formatCurrency(order.totalAmount - order.quoteAmount)}
                 </div>
-              ))}
+              </div>
+            </div>
+            <div className="bg-white rounded-lg p-3 border border-amber-100">
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-slate-500">实际利润率</span>
+                <span className={`text-lg font-bold ${order.totalCost > 0 ? (order.totalAmount - order.totalCost >= 0 ? 'text-emerald-600' : 'text-red-500') : 'text-slate-400'}`}>
+                  {order.totalCost > 0 ? `${((order.totalAmount - order.totalCost) / order.totalCost * 100).toFixed(1)}%` : '-'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl shadow-lg p-6 text-white">
+            <h3 className="text-base font-bold mb-4">费用明细（按项目）</h3>
+            <div className="space-y-3">
+              {order.items.map((item, idx) => {
+                const actualProfit = item.totalCost > 0 ? ((item.finalSubtotal - item.totalCost) / item.totalCost * 100).toFixed(1) : '-';
+                return (
+                  <div key={item.id} className="bg-white/5 rounded-xl p-4 border border-white/10">
+                    <div className="flex justify-between items-center mb-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-slate-200">第 {idx + 1} 项</span>
+                        {item.useManualPrice && (
+                          <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 text-[10px] font-bold rounded-full border border-emerald-500/30">
+                            手动改价
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-right">
+                        {item.useManualPrice ? (
+                          <div>
+                            <div className="text-[10px] text-slate-500 line-through">建议 {formatCurrency(item.subtotal)}</div>
+                            <div className="text-emerald-400 font-bold">{formatCurrency(item.finalSubtotal)}</div>
+                          </div>
+                        ) : (
+                          <span className="text-amber-400 font-bold">{formatCurrency(item.subtotal)}</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="space-y-1.5 text-xs">
+                      <div className="flex justify-between text-slate-400">
+                        <span>纸张成本</span>
+                        <span>¥{item.paperCost.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between text-slate-400">
+                        <span>印刷成本</span>
+                        <span>¥{item.printingCost.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between text-slate-400">
+                        <span>覆膜成本</span>
+                        <span>¥{item.laminationCost.toFixed(2)}</span>
+                      </div>
+                      {item.otherCost > 0 && (
+                        <div className="flex justify-between text-slate-400">
+                          <span>其他成本</span>
+                          <span>¥{item.otherCost.toFixed(2)}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between text-white pt-2 mt-2 border-t border-white/10">
+                        <span>总成本</span>
+                        <span className="font-medium">¥{item.totalCost.toFixed(2)}</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 pt-1.5">
+                        <div className="flex justify-between text-blue-400">
+                          <span>建议利润率</span>
+                          <span className="font-medium">{item.profitRate}%</span>
+                        </div>
+                        <div className="flex justify-between text-emerald-400">
+                          <span>实际利润率</span>
+                          <span className="font-medium">{actualProfit}%</span>
+                        </div>
+                        <div className="flex justify-between text-slate-400">
+                          <span>建议单价</span>
+                          <span>¥{item.unitPrice.toFixed(4)}</span>
+                        </div>
+                        <div className={`flex justify-between ${item.useManualPrice ? 'text-emerald-400 font-medium' : 'text-slate-300'}`}>
+                          <span>{item.useManualPrice ? '实际单价' : '单价'}</span>
+                          <span>¥{(item.useManualPrice ? item.finalUnitPrice : item.unitPrice).toFixed(4)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
             <div className="pt-5 mt-5 border-t border-white/10">
               <div className="flex justify-between items-center">

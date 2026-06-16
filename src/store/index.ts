@@ -21,6 +21,7 @@ interface AppState {
 
   addProductionOrder: (data: Omit<ProductionOrder, 'id' | 'createdAt'>) => ProductionOrder;
   updateProductionOrder: (id: string, data: Partial<ProductionOrder>) => ProductionOrder | null;
+  updateProductionOrderWithSync: (id: string, data: Partial<ProductionOrder>) => ProductionOrder | null;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -98,6 +99,26 @@ export const useAppStore = create<AppState>((set, get) => ({
       set((state) => ({
         productionOrders: state.productionOrders.map((p) => (p.id === id ? updated : p))
       }));
+    }
+    return updated;
+  },
+
+  updateProductionOrderWithSync: (id, data) => {
+    const updated = productionStorage.update(id, data);
+    if (updated) {
+      set((state) => ({
+        productionOrders: state.productionOrders.map((p) => (p.id === id ? updated : p))
+      }));
+
+      if (data.status) {
+        const { updateOrderStatus } = get();
+        const orderId = updated.orderId;
+        if (data.status === 'producing') {
+          updateOrderStatus(orderId, 'in_production');
+        } else if (data.status === 'done') {
+          updateOrderStatus(orderId, 'completed');
+        }
+      }
     }
     return updated;
   }

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Save, Send, Printer } from 'lucide-react';
+import { ArrowLeft, Save, Printer, Plus, TrendingUp, Layers } from 'lucide-react';
 import CustomerSelector from '@/components/Order/CustomerSelector';
 import ProductForm from '@/components/Order/ProductForm';
 import { useAppStore } from '@/store';
@@ -13,14 +13,35 @@ export default function OrderNew() {
   const navigate = useNavigate();
   const { addOrder, addProductionOrder } = useAppStore();
   const [customer, setCustomer] = useState<Customer | null>(null);
-  const [orderItem, setOrderItem] = useState<OrderItem | null>(null);
   const [remark, setRemark] = useState('');
+  const [items, setItems] = useState<(OrderItem | null)[]>([null]);
 
-  const totalAmount = orderItem?.subtotal || 0;
+  const validItems = items.filter((i): i is OrderItem => i !== null);
+  const totalCost = validItems.reduce((s, i) => s + i.totalCost, 0);
+  const quoteAmount = validItems.reduce((s, i) => s + i.subtotal, 0);
+  const totalAmount = validItems.reduce((s, i) => s + i.finalSubtotal, 0);
+  const actualProfit = totalCost > 0 ? ((totalAmount - totalCost) / totalCost) * 100 : 0;
+
+  const addItem = () => {
+    setItems([...items, null]);
+  };
+
+  const removeItem = (index: number) => {
+    if (items.length <= 1) return;
+    setItems(items.filter((_, i) => i !== index));
+  };
+
+  const updateItem = (index: number, item: OrderItem | null) => {
+    setItems(items.map((it, i) => (i === index ? item : it)));
+  };
 
   const handleSaveOrder = (status: 'quoted' | 'confirmed') => {
-    if (!customer || !orderItem) {
-      alert('请先选择客户并填写产品信息');
+    if (!customer) {
+      alert('请先选择客户！');
+      return;
+    }
+    if (validItems.length === 0) {
+      alert('请至少填写一项产品信息！');
       return;
     }
 
@@ -29,15 +50,17 @@ export default function OrderNew() {
       customerId: customer.id,
       customerName: customer.name,
       customerPhone: customer.phone,
-      items: [orderItem],
+      items: validItems,
       status,
       remark,
       totalAmount,
+      quoteAmount,
+      totalCost,
       confirmedAt: status === 'confirmed' ? new Date().toISOString() : undefined
     });
 
     if (status === 'confirmed') {
-      const productionItems: ProductionItem[] = order.items.map((item) => ({
+      const productionItems: ProductionItem[] = validItems.map((item) => ({
         orderItemId: item.id,
         productName: item.productName,
         paperSpec: `${PAPER_TYPE_LABELS[item.paperType]}${item.paperWeight}g`,
@@ -64,9 +87,9 @@ export default function OrderNew() {
         status: 'pending'
       });
 
-      alert(`订单已确认！\n订单号：${order.orderNo}\n生产单已同步生成`);
+      alert(`✅ 订单已确认！\n订单号：${order.orderNo}\n生产单已同步生成`);
     } else {
-      alert(`报价单已保存！\n订单号：${order.orderNo}`);
+      alert(`📋 报价单已保存！\n订单号：${order.orderNo}`);
     }
 
     navigate(`/orders/${order.id}`);
@@ -74,7 +97,7 @@ export default function OrderNew() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-4">
           <button
             onClick={() => navigate(-1)}
@@ -84,13 +107,13 @@ export default function OrderNew() {
           </button>
           <div>
             <h1 className="text-2xl font-bold text-slate-800">新建订单</h1>
-            <p className="text-sm text-slate-500 mt-1">录入客户信息、产品规格，自动计算拼版与报价</p>
+            <p className="text-sm text-slate-500 mt-1">支持多产品项录入，系统自动汇总报价</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
           <button
             onClick={() => handleSaveOrder('quoted')}
-            disabled={!customer || !orderItem}
+            disabled={!customer || validItems.length === 0}
             className="flex items-center gap-2 px-5 py-2.5 bg-white border border-slate-200 text-slate-700 font-semibold rounded-xl hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm"
           >
             <Save className="w-4 h-4" />
@@ -98,7 +121,7 @@ export default function OrderNew() {
           </button>
           <button
             onClick={() => handleSaveOrder('confirmed')}
-            disabled={!customer || !orderItem}
+            disabled={!customer || validItems.length === 0}
             className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 text-white font-semibold rounded-xl hover:from-amber-600 hover:to-amber-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm shadow-amber-200"
           >
             <Printer className="w-4 h-4" />
@@ -108,9 +131,27 @@ export default function OrderNew() {
       </div>
 
       <div className="grid grid-cols-3 gap-6">
-        <div className="col-span-2 space-y-6">
+        <div className="col-span-2 space-y-5">
           <CustomerSelector selectedCustomer={customer} onSelect={setCustomer} />
-          <ProductForm onChange={setOrderItem} />
+
+          {items.map((item, index) => (
+            <ProductForm
+              key={index}
+              itemIndex={index}
+              itemValue={item}
+              canRemove={items.length > 1}
+              onRemove={() => removeItem(index)}
+              onChange={(it) => updateItem(index, it)}
+            />
+          ))}
+
+          <button
+            onClick={addItem}
+            className="w-full py-4 border-2 border-dashed border-slate-300 rounded-xl text-slate-500 hover:border-amber-400 hover:text-amber-600 hover:bg-amber-50/40 transition-all flex items-center justify-center gap-2 font-semibold text-sm"
+          >
+            <Plus className="w-5 h-5" />
+            增加产品项（同订单可加印名片、宣传单等多种）
+          </button>
 
           <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-5">
             <h3 className="text-base font-bold text-slate-800 flex items-center gap-2 mb-4">
@@ -126,14 +167,19 @@ export default function OrderNew() {
           </div>
         </div>
 
-        <div className="space-y-6">
+        <div className="space-y-5">
           <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl shadow-lg p-5 text-white sticky top-6">
-            <h3 className="text-base font-bold mb-4 flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
-              订单汇总
-            </h3>
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-base font-bold flex items-center gap-2">
+                <Layers className="w-5 h-5 text-amber-400" />
+                订单汇总
+              </h3>
+              <span className="px-2.5 py-1 bg-white/10 rounded-lg text-xs font-bold border border-white/10">
+                {validItems.length} 项产品
+              </span>
+            </div>
 
-            {customer && orderItem ? (
+            {customer && validItems.length > 0 ? (
               <div className="space-y-4">
                 <div className="bg-white/5 rounded-xl p-4 backdrop-blur-sm border border-white/10">
                   <div className="text-xs text-slate-400 mb-2">客户信息</div>
@@ -141,62 +187,64 @@ export default function OrderNew() {
                   <div className="text-sm text-slate-300 mt-1">{customer.phone}</div>
                 </div>
 
-                <div className="bg-white/5 rounded-xl p-4 backdrop-blur-sm border border-white/10">
-                  <div className="text-xs text-slate-400 mb-2">产品</div>
-                  <div className="font-semibold">{orderItem.productName}</div>
-                  <div className="text-sm text-slate-300 mt-1">
-                    {orderItem.finishedWidth}×{orderItem.finishedHeight}mm · {orderItem.quantity.toLocaleString()}张
-                  </div>
-                  <div className="text-sm text-slate-300">
-                    {PAPER_TYPE_LABELS[orderItem.paperType]} {orderItem.paperWeight}g
-                  </div>
+                <div className="bg-white/5 rounded-xl p-4 backdrop-blur-sm border border-white/10 space-y-2">
+                  <div className="text-xs text-slate-400 mb-2">产品明细</div>
+                  {validItems.map((item, idx) => (
+                    <div key={idx} className="flex justify-between items-start py-1.5 text-xs border-b border-white/5 last:border-0">
+                      <div>
+                        <div className="font-semibold text-slate-100">
+                          {idx + 1}. {item.productName}
+                        </div>
+                        <div className="text-slate-400 mt-0.5">
+                          {item.quantity.toLocaleString()}张 · {item.parentPaperName} {item.sheetsNeeded}张
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className={`font-bold ${item.useManualPrice ? 'text-emerald-400' : 'text-amber-400'}`}>
+                          ¥{item.finalSubtotal.toFixed(2)}
+                        </div>
+                        {item.useManualPrice && (
+                          <div className="text-slate-500 text-[10px] mt-0.5">(手动定价)</div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
 
-                <div className="bg-white/5 rounded-xl p-4 backdrop-blur-sm border border-white/10">
-                  <div className="text-xs text-slate-400 mb-2">拼版信息</div>
+                <div className="pt-2 space-y-2">
                   <div className="flex justify-between text-sm">
-                    <span className="text-slate-300">用纸规格</span>
-                    <span className="font-medium">{orderItem.parentPaperName}</span>
+                    <span className="text-slate-400">成本合计</span>
+                    <span>¥{totalCost.toFixed(2)}</span>
                   </div>
-                  <div className="flex justify-between text-sm mt-1">
-                    <span className="text-slate-300">拼版方式</span>
-                    <span className="font-medium">
-                      {orderItem.layoutHorizontal}×{orderItem.layoutVertical} = {orderItem.perSheetCount}张
-                      {orderItem.rotated && ' (旋转)'}
-                    </span>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-400">系统建议价</span>
+                    <span className="text-slate-200">¥{quoteAmount.toFixed(2)}</span>
                   </div>
-                  <div className="flex justify-between text-sm mt-1">
-                    <span className="text-slate-300">用纸张数</span>
-                    <span className="font-medium text-amber-400 font-bold">{orderItem.sheetsNeeded}张</span>
-                  </div>
+                  {totalAmount !== quoteAmount && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-emerald-400 flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                        手动调整差额
+                      </span>
+                      <span className={totalAmount > quoteAmount ? 'text-emerald-400' : 'text-red-400'}>
+                        {totalAmount > quoteAmount ? '+' : ''}¥{(totalAmount - quoteAmount).toFixed(2)}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
-                <div className="pt-4 border-t border-white/10 space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-slate-400">纸张成本</span>
-                    <span>¥{orderItem.paperCost.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-slate-400">印刷成本</span>
-                    <span>¥{orderItem.printingCost.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-slate-400">覆膜成本</span>
-                    <span>¥{orderItem.laminationCost.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-slate-400">总成本</span>
-                    <span className="font-medium">¥{orderItem.totalCost.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-slate-400">利润率</span>
-                    <span className="text-emerald-400 font-medium">{orderItem.profitRate}%</span>
-                  </div>
-                </div>
-
-                <div className="pt-4 border-t border-white/10">
+                <div className="pt-4 mt-4 border-t border-white/10">
                   <div className="flex justify-between items-center">
-                    <span className="text-slate-300 font-medium">应收金额</span>
+                    <div>
+                      <div className="text-lg font-semibold">应收金额</div>
+                      <div className="flex items-center gap-1 mt-1 text-xs text-slate-400">
+                        <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+                        综合利润率
+                        <span className={`font-bold ml-1 ${actualProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                          {actualProfit.toFixed(1)}%
+                        </span>
+                      </div>
+                    </div>
                     <span className="text-3xl font-bold bg-gradient-to-r from-amber-400 to-orange-400 bg-clip-text text-transparent">
                       {formatCurrency(totalAmount)}
                     </span>
@@ -204,8 +252,10 @@ export default function OrderNew() {
                 </div>
               </div>
             ) : (
-              <div className="py-12 text-center text-slate-500 text-sm">
-                请先选择客户并填写产品信息
+              <div className="py-12 text-center text-slate-500 text-sm space-y-2">
+                <Layers className="w-10 h-10 mx-auto text-slate-600 opacity-40" />
+                <p>请先选择客户</p>
+                <p className="text-slate-600">并填写至少一项产品信息</p>
               </div>
             )}
           </div>

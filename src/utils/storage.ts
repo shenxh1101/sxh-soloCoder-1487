@@ -94,12 +94,30 @@ export const customerStorage = {
 export const orderStorage = {
   getAll(): Order[] {
     const orders = getFromStorage<Order[]>(STORAGE_KEYS.ORDERS, []);
-    if (orders.length === 0) {
+    const patched = orders.map(order => {
+      const items = order.items.map(item => ({
+        ...item,
+        useManualPrice: item.useManualPrice ?? false,
+        finalUnitPrice: item.finalUnitPrice ?? item.unitPrice,
+        finalSubtotal: item.finalSubtotal ?? item.subtotal
+      }));
+      const totalCost = items.reduce((s, i) => s + i.totalCost, 0);
+      const quoteAmount = items.reduce((s, i) => s + i.subtotal, 0);
+      const totalAmount = items.reduce((s, i) => s + (i.finalSubtotal || i.subtotal), 0);
+      return {
+        ...order,
+        items,
+        totalCost: order.totalCost ?? totalCost,
+        quoteAmount: order.quoteAmount ?? quoteAmount,
+        totalAmount: order.totalAmount || totalAmount
+      };
+    });
+    if (patched.length === 0) {
       const defaultOrders = generateSampleOrders();
       saveToStorage(STORAGE_KEYS.ORDERS, defaultOrders);
       return defaultOrders;
     }
-    return orders;
+    return patched;
   },
   save(orders: Order[]): void {
     saveToStorage(STORAGE_KEYS.ORDERS, orders);
@@ -237,6 +255,7 @@ function generateSampleOrders(): Order[] {
     const totalCost = +(paperCost + printingCost + laminationCost).toFixed(2);
     const subtotal = +(totalCost * (1 + data.profit / 100)).toFixed(2);
 
+    const unitPrice = +(subtotal / data.qty).toFixed(4);
     orders.push({
       id: generateId(),
       orderNo: `PO2026${String(now.getMonth() + 1).padStart(2, '0')}${String(1000 + idx).padStart(4, '0')}`,
@@ -245,6 +264,8 @@ function generateSampleOrders(): Order[] {
       customerPhone: customer.phone,
       status: data.status,
       totalAmount: subtotal,
+      quoteAmount: subtotal,
+      totalCost,
       remark: idx % 3 === 0 ? '加急处理' : undefined,
       createdAt: date.toISOString(),
       confirmedAt: data.status !== 'quoted' ? date.toISOString() : undefined,
@@ -274,8 +295,11 @@ function generateSampleOrders(): Order[] {
         otherCost: 0,
         totalCost,
         profitRate: data.profit,
-        unitPrice: +(subtotal / data.qty).toFixed(4),
-        subtotal
+        unitPrice,
+        subtotal,
+        useManualPrice: false,
+        finalUnitPrice: unitPrice,
+        finalSubtotal: subtotal
       }]
     });
   });
